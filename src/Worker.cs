@@ -10,7 +10,7 @@ namespace Websocket_Server.src
 
         private TcpClient client;
         private Server server;
-        
+
         public Worker(TcpClient client, Server server, int id)
         {
             this.client = client;
@@ -27,11 +27,17 @@ namespace Websocket_Server.src
             while (true)
             {
                 while (!stream.DataAvailable) ;
-                while (client.Available < 3); // match against "get"
+                while (client.Available < 3) ; // match against "get"
 
                 byte[] bytes = new byte[client.Available];
                 stream.Read(bytes, 0, client.Available);
                 string s = Encoding.UTF8.GetString(bytes);
+
+                for (int i = 0; i < bytes.Length; i++)
+                {
+                    Console.Write(bytes[i] + " ");
+                }
+                System.Console.WriteLine();
 
                 if (Regex.IsMatch(s, "^GET", RegexOptions.IgnoreCase))
                 {
@@ -117,11 +123,19 @@ namespace Websocket_Server.src
                     Console.WriteLine();
                 }
 
-                stream.Write(bytes, 0, bytes.Length);
+
+                sendMessage(stream, "Hello, client!");
             }
 
 
             System.Console.WriteLine("[Worker {0}] - Terminated.\n", Id);
+        }
+
+        private void sendMessage(NetworkStream stream, string message)
+        {
+            
+
+            // stream.Write(response, 0, response.Length);
         }
     }
 }

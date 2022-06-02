@@ -24,10 +24,12 @@ websocket.onclose = function (e) {
 };
 
 websocket.onmessage = function (e) {
+    console.warn("Got a message");
     writeToScreen("<span>RESPONSE: " + e.data + "</span>");
 };
 
 websocket.onerror = function (e) {
+    console.log(e);
     writeToScreen("<span class=error>ERROR:</span> " + e.data);
 };
 
