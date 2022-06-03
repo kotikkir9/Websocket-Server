@@ -33,12 +33,6 @@ namespace Websocket_Server.src
                 stream.Read(bytes, 0, client.Available);
                 string s = Encoding.UTF8.GetString(bytes);
 
-                for (int i = 0; i < bytes.Length; i++)
-                {
-                    Console.Write(bytes[i] + " ");
-                }
-                System.Console.WriteLine();
-
                 if (Regex.IsMatch(s, "^GET", RegexOptions.IgnoreCase))
                 {
                     // Console.WriteLine("[Worker {0}] - |===== Handshaking from client =====|\n{1}", Id, s);
@@ -63,6 +57,9 @@ namespace Websocket_Server.src
                 }
                 else
                 {
+                    // print received bytes
+                    printBytes(bytes);
+
                     bool fin = (bytes[0] & 0b10000000) != 0,
                         mask = (bytes[1] & 0b10000000) != 0; // must be true, "All messages from the client to the server have this bit set"
                     int opcode = bytes[0] & 0b00001111, // expecting 1 - text message
@@ -103,39 +100,64 @@ namespace Websocket_Server.src
                         byte[] masks = new byte[4] { bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3] };
                         offset += 4;
 
-                        System.Console.Write("[Worker {0}] - ", Id);
                         for (ulong i = 0; i < msglen; ++i)
                         {
                             decoded[i] = (byte)(bytes[(ulong)offset + i] ^ masks[i % 4]);
-                            if (i + 1 < msglen)
-                                System.Console.Write("{0} - ", decoded[i]);
-                            else
-                                System.Console.WriteLine("{0}", decoded[i]);
                         }
-
 
                         string text = Encoding.UTF8.GetString(decoded);
                         Console.WriteLine("[Worker {0}] - Received message: {1}", Id, text);
+
+                        // Send the same message back to the client
+                        sendMessage(stream, text);
                     }
                     else
                         Console.WriteLine("[Worker {0}] - mask bit not set", Id);
 
                     Console.WriteLine();
                 }
-
-
-                sendMessage(stream, "Hello, client!");
             }
-
-
             System.Console.WriteLine("[Worker {0}] - Terminated.\n", Id);
         }
 
         private void sendMessage(NetworkStream stream, string message)
         {
-            
+            List<byte> response = new List<byte>();
+            response.Add((byte)0b_1000_0001);                                                   // opcode 0x81 - text message UTF-8
 
-            // stream.Write(response, 0, response.Length);
+            // First bit of the following byte is 0, which means that the message is NOT masked
+            // RFC 6455 - Section 5.1:
+            // A server MUST NOT mask any frames that it sends to the client. A client MUST close a connection if it detects a masked frame.
+            if (message.Length < 126)
+            {
+                byte len = (byte)((byte)message.Length);
+                response.Add(len);
+
+            }
+            else if (message.Length < 65536)
+            {
+                response.Add(0b_0111_1110);                                                     // 126 => length >= 126 && length < 65536
+                response.AddRange(BitConverter.GetBytes((UInt16)(message.Length)).Reverse());   // 2 bytes that represent the length of the message
+            }
+            else
+            {
+                //NOT TESTED!
+                response.Add(0b_0111_1111);                                                     // 127 => length >= 65536
+                response.AddRange(BitConverter.GetBytes((UInt64)(message.Length)).Reverse());   // 8 bytes that represent the length of the message 
+            }
+
+            foreach(byte b in message) response.Add(b);                                         // message itself as byte array
+            stream.Write(response.ToArray(), 0, response.Count);                                // convert list to array, and send to client
+        }
+
+
+        private void printBytes(byte[] bytes)
+        {
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                Console.Write(bytes[i] + " ");
+            }
+            System.Console.WriteLine();
         }
     }
 }

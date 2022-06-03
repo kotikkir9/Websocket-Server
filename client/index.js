@@ -15,7 +15,7 @@ discButton.addEventListener("click", () => {
 websocket.onopen = function (e) {
     socketOpen = true;
     writeToScreen("CONNECTED");
-    doSend("WebSocket rocks");
+    doSend("Hello");
 };
 
 websocket.onclose = function (e) {
@@ -24,7 +24,6 @@ websocket.onclose = function (e) {
 };
 
 websocket.onmessage = function (e) {
-    console.warn("Got a message");
     writeToScreen("<span>RESPONSE: " + e.data + "</span>");
 };
 
