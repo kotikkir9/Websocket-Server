@@ -6,8 +6,6 @@ namespace Websocket_Server.src
 {
     public class Server
     {
-        private static int workerId = 0;
-
         private string ip = "127.0.0.1";
         private int port = 80;
         private TcpListener server;
@@ -31,27 +29,33 @@ namespace Websocket_Server.src
                 try
                 {
                     client = server.AcceptTcpClient();
-                   
-                    Worker worker = new Worker(client, this, ++workerId);
-                    workers.Add(worker);
-
-                    Thread thread = new Thread(worker.Run);
-                    thread.Start(); 
-
+                    Worker worker = new Worker(client, this);
                     client = null;
                 }
                 catch (Exception e)
                 {
                     System.Console.WriteLine("[Server] - Something went wrong while accepting a client: {0}", e.Message);
-                    // return;
                 }
             }
         }
 
-        public void removeWorker(Worker worker)
+        public void AddWorker(Worker worker)
+        {
+            workers.Add(worker);
+        }
+
+        public void RemoveWorker(Worker worker)
         {
             workers.Remove(worker);
             System.Console.WriteLine("[Server] - Worker {0} has been removed.", worker.Id);
+        }
+
+        public void Broadcast(string message, Worker worker)
+        {
+            foreach (Worker w in workers)
+            {
+                 w.SendMessage(message);
+            }
         }
     }
 }

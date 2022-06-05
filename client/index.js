@@ -2,23 +2,35 @@ let socketOpen = false;
 
 const button = document.querySelector("#send"),
     discButton = document.querySelector("#disconnect"),
+    jsonButton = document.querySelector("#json"),
     output = document.querySelector("#output"),
     textarea = document.querySelector("textarea"),
     wsUri = "ws://127.0.0.1/",
     websocket = new WebSocket(wsUri);
 
 button.addEventListener("click", onClickButton);
+jsonButton.addEventListener("click", () => {
+    const person = {
+        name: "John",
+        age: 30,
+        city: "New York"
+    }
+
+    doSend(JSON.stringify(person));
+});
+
 discButton.addEventListener("click", () => {
     websocket.close();
 });
 
-websocket.onopen = function (e) {
+
+websocket.onopen = function () {
     socketOpen = true;
     writeToScreen("CONNECTED");
-    doSend("Hello");
+    // doSend("Hello");
 };
 
-websocket.onclose = function (e) {
+websocket.onclose = function () {
     socketOpen = false;
     writeToScreen("DISCONNECTED");
 };

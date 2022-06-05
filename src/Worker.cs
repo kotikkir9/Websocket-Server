@@ -6,21 +6,24 @@ namespace Websocket_Server.src
 {
     public class Worker
     {
-        public int Id { get; }
+        public Guid Id { get; }
 
         private TcpClient client;
         private Server server;
 
-        public Worker(TcpClient client, Server server, int id)
+        public Worker(TcpClient client, Server server)
         {
             this.client = client;
             this.server = server;
-            this.Id = id;
+            this.Id = Guid.NewGuid();
+            
+            Thread thread = new Thread(this.Run);
+            thread.Start();
         }
 
         public void Run()
         {
-            Console.WriteLine("[Worker {0}] - Client has connected.", Id);
+            Console.WriteLine("[{0}] - Client has connected.", Id);
             NetworkStream stream = client.GetStream();
 
             // enter to an infinite cycle to be able to handle every change in stream
@@ -54,24 +57,24 @@ namespace Websocket_Server.src
                         "Sec-WebSocket-Accept: " + swkaSha1Base64 + "\r\n\r\n");
 
                     stream.Write(response, 0, response.Length);
+                    server.AddWorker(this);
+                    server.Broadcast($"New client connected.", this);
                 }
                 else
                 {
-                    // print received bytes
-                    printBytes(bytes);
-
                     bool fin = (bytes[0] & 0b10000000) != 0,
                         mask = (bytes[1] & 0b10000000) != 0; // must be true, "All messages from the client to the server have this bit set"
                     int opcode = bytes[0] & 0b00001111, // expecting 1 - text message
                         offset = 2;
                     ulong msglen = (ulong)bytes[1] & 0b01111111;
-                    System.Console.WriteLine("[Worker {4}] - fin: {0}, mask: {1}, opcode: {2}, msglen: {3}", fin, mask, opcode, msglen, Id);
+                    System.Console.WriteLine("[{4}] - fin: {0}, mask: {1}, opcode: {2}, msglen: {3}", fin, mask, opcode, msglen, Id);
 
                     if (opcode == 8)
                     {
+                        server.RemoveWorker(this);
+                        server.Broadcast("Client has disconnected.", this);
+                        Console.WriteLine("[{0}] - Client disconnected!", Id);
                         client.Close();
-                        Console.WriteLine("[Worker {0}] - Client disconnected!", Id);
-                        server.removeWorker(this);
                         break;
                     }
 
@@ -87,13 +90,13 @@ namespace Websocket_Server.src
                         // To test the below code, we need to manually buffer larger messages — since the NIC's autobuffering 
                         // may be too latency-friendly for this code to run (that is, we may have only some of the bytes in this
                         // websocket frame available through client.Available).  
-                        System.Console.WriteLine("[Worker {0}] - 127 HERE", Id);
+                        System.Console.WriteLine("[{0}] - 127 HERE", Id);
                         msglen = BitConverter.ToUInt64(new byte[] { bytes[9], bytes[8], bytes[7], bytes[6], bytes[5], bytes[4], bytes[3], bytes[2] });
                         offset = 10;
                     }
 
                     if (msglen == 0)
-                        Console.WriteLine("[Worker {0}] - msglen == 0");
+                        Console.WriteLine("[{0}] - msglen == 0");
                     else if (mask)
                     {
                         byte[] decoded = new byte[msglen];
@@ -106,21 +109,22 @@ namespace Websocket_Server.src
                         }
 
                         string text = Encoding.UTF8.GetString(decoded);
-                        Console.WriteLine("[Worker {0}] - Received message: {1}", Id, text);
+                        Console.WriteLine("[{0}] - Received message: {1}", Id, text);
 
-                        // Send the same message back to the client
-                        sendMessage(stream, text);
+                        server.Broadcast(text, this);
                     }
                     else
-                        Console.WriteLine("[Worker {0}] - mask bit not set", Id);
+                        Console.WriteLine("[{0}] - mask bit not set", Id);
 
                     Console.WriteLine();
                 }
             }
-            System.Console.WriteLine("[Worker {0}] - Terminated.\n", Id);
+
+            System.Console.WriteLine("[{0}] - Terminated.\n", Id);
         }
 
-        private void sendMessage(NetworkStream stream, string message)
+
+        public void SendMessage(string message)
         {
             List<byte> response = new List<byte>();
             response.Add((byte)0b_1000_0001);                                                   // opcode 0x81 - text message UTF-8
@@ -147,17 +151,7 @@ namespace Websocket_Server.src
             }
 
             foreach(byte b in message) response.Add(b);                                         // message itself as byte array
-            stream.Write(response.ToArray(), 0, response.Count);                                // convert list to array, and send to client
-        }
-
-
-        private void printBytes(byte[] bytes)
-        {
-            for (int i = 0; i < bytes.Length; i++)
-            {
-                Console.Write(bytes[i] + " ");
-            }
-            System.Console.WriteLine();
+            client.GetStream().Write(response.ToArray(), 0, response.Count);                                // convert list to array, and send to client
         }
     }
 }
