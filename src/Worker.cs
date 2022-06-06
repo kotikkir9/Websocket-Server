@@ -29,16 +29,16 @@ namespace Websocket_Server.src
             // enter to an infinite cycle to be able to handle every change in stream
             while (true)
             {
-                while (!stream.DataAvailable) ;
-                while (client.Available < 3) ; // match against "get"
+                // while (!stream.DataAvailable);
+                // while (client.Available < 3); // match against "get"
 
-                byte[] bytes = new byte[client.Available];
-                stream.Read(bytes, 0, client.Available);
+                byte[] bytes = new byte[client.ReceiveBufferSize];
+                stream.Read(bytes, 0, bytes.Length);
                 string s = Encoding.UTF8.GetString(bytes);
 
                 if (Regex.IsMatch(s, "^GET", RegexOptions.IgnoreCase))
                 {
-                    // Console.WriteLine("[Worker {0}] - |===== Handshaking from client =====|\n{1}", Id, s);
+                    // Console.Write("[Worker {0}] - |===== Handshaking from client =====|\n{1}", Id, s);
 
                     // 1. Obtain the value of the "Sec-WebSocket-Key" request header without any leading or trailing whitespace
                     // 2. Concatenate it with "258EAFA5-E914-47DA-95CA-C5AB0DC85B11" (a special GUID specified by RFC 6455)
